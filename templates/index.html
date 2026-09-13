@@ -500,12 +500,6 @@
             }
         });
 
-        function escapeSingleQuotedJsString(value) {
-            return String(value)
-                .replace(/\\/g, "\\\\")
-                .replace(/'/g, "\\'");
-        }
-
         async function loadGISRegistry() {
             try {
                 const res = await fetch('/api/cameras');
@@ -534,19 +528,21 @@
                     if (isOnline) statusCls = 'bg-emerald-950 text-emerald-400 border border-emerald-800';
                     else if (isDegraded) statusCls = 'bg-amber-950 text-amber-400 border border-amber-800';
 
-                    const escapedCamId = escapeSingleQuotedJsString(cam.cam_id);
-                    const escapedCamName = escapeSingleQuotedJsString(cam.name);
-                    const escapedCamDepartment = escapeSingleQuotedJsString(cam.department);
-
                     let assignHtml = '';
                     if (isOnline || isDegraded) {
+                        const escapeJsSingleQuoted = (value) => String(value)
+                            .replace(/\\/g, "\\\\")
+                            .replace(/'/g, "\\'");
+                        const escapedCamId = escapeJsSingleQuoted(cam.cam_id);
+                        const escapedCamName = escapeJsSingleQuoted(cam.name);
+                        const escapedDepartment = escapeJsSingleQuoted(cam.department);
                         assignHtml = `
                                 <div class="pt-2 text-[10px] font-bold text-slate-400 uppercase">Assign to Video Wall Slot:</div>
                                 <div class="grid grid-cols-2 gap-1 pt-1">
-                                    <button onclick="assignToSlot(0, '${escapedCamId}', '${escapedCamName}', '${escapedCamDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 1</button>
-                                    <button onclick="assignToSlot(1, '${escapedCamId}', '${escapedCamName}', '${escapedCamDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 2</button>
-                                    <button onclick="assignToSlot(2, '${escapedCamId}', '${escapedCamName}', '${escapedCamDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 3</button>
-                                    <button onclick="assignToSlot(3, '${escapedCamId}', '${escapedCamName}', '${escapedCamDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 4</button>
+                                    <button onclick="assignToSlot(0, '${escapedCamId}', '${escapedCamName}', '${escapedDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 1</button>
+                                    <button onclick="assignToSlot(1, '${escapedCamId}', '${escapedCamName}', '${escapedDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 2</button>
+                                    <button onclick="assignToSlot(2, '${escapedCamId}', '${escapedCamName}', '${escapedDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 3</button>
+                                    <button onclick="assignToSlot(3, '${escapedCamId}', '${escapedCamName}', '${escapedDepartment}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 4</button>
                                 </div>`;
                     } else {
                         assignHtml = '<div class="text-red-400 italic mt-1">Feed Offline - Unavailable</div>';
