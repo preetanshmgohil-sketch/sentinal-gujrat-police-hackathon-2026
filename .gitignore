@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+env/
+
+# Environment
+.env
+.auth_cookie
+
+# Database
+registry.db
+registry.db-wal
+registry.db-shm
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+server_out.txt
+server_err.txt
+server_log.txt
+
+# Generated files
+*.jpg
+*.png
+!static/*.png
+!templates/*.html
+
+# Models (large files — use Git LFS or download separately)
+models/best.pt
+models/.cache/
+yolov8n.pt
+
+# Temporary
+test_*.py
+verify.py
+clean_db.py
+create_pptx.py
+q.py
+start.cmd
+Presentation.html
+*.pptx

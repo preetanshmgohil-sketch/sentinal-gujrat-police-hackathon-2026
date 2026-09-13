@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel VMS | ANPR Watchlist Alerts</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @keyframes flash-red {
+    0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
+    50% { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 12px rgba(239, 68, 68, 0.5); }
+  }
+  .flash-new { animation: flash-red 1.2s ease-in-out 3; }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  .nav-link { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
+  .nav-link:hover { background-color: rgba(255,255,255,0.08); }
+  .nav-link.active { background-color: rgba(255,255,255,0.12); }
+  .mono { font-family: 'Courier New', Courier, monospace; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  .fade-in { animation: fadeIn 0.3s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex">
+
+<aside class="w-[52px] bg-slate-900 border-r border-slate-800 flex flex-col items-center py-3 gap-1 shrink-0 fixed top-0 left-0 h-full z-30">
+  <a href="/" class="nav-link rounded-lg text-slate-400 hover:text-white active" title="Dashboard">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  </a>
+  <a href="/watchlist" class="nav-link rounded-lg text-slate-400 hover:text-white" title="Watchlist">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </a>
+  <a href="/vehicle-search" class="nav-link rounded-lg text-slate-400 hover:text-white" title="Vehicle Search">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  </a>
+  <a href="/anpr-alerts" class="nav-link rounded-lg text-slate-400 hover:text-white active" title="ANPR Alerts">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  </a>
+  <a href="/events" class="nav-link rounded-lg text-slate-400 hover:text-white" title="Events">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+  </a>
+  <a href="/violations" class="nav-link rounded-lg text-slate-400 hover:text-white" title="Violations">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  </a>
+</aside>
+
+<div id="page-content" class="ml-[52px] flex-1 min-h-screen flex flex-col">
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <h1 class="text-lg font-semibold tracking-tight">Sentinel VMS <span class="text-slate-500 font-normal">| Unified Command</span></h1>
+    </div>
+    <div class="flex items-center gap-3 text-sm text-slate-400">
+      <span id="clock"></span>
+    </div>
+  </header>
+
+  <main class="flex-1 p-6 overflow-auto">
+    <div class="max-w-[1400px] mx-auto space-y-6 fade-in">
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-3">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <h2 class="text-2xl font-bold text-red-400">ANPR Watchlist Alerts</h2>
+          </div>
+          <p class="text-slate-500 text-sm mt-1 ml-9">Real-time watchlist matches from live camera feeds</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot inline-block"></span>
+            <span>Auto-refresh 5s</span>
+          </div>
+          <a href="/api/export/anpr" class="px-3 py-1.5 bg-indigo-900 hover:bg-indigo-800 border border-indigo-700 rounded text-sm text-indigo-200 transition flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </a>
+          <button onclick="fetchAll()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-sm text-slate-300 transition flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 text-center">
+          <div class="text-2xl font-bold text-white" id="stat-total">-</div>
+          <div class="text-xs text-slate-500 mt-1">Total Alerts</div>
+        </div>
+        <div class="bg-slate-900 border border-red-900/40 rounded-lg p-4 text-center">
+          <div class="text-2xl font-bold text-red-400" id="stat-unack">-</div>
+          <div class="text-xs text-slate-500 mt-1">Unacknowledged</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 text-center">
+          <div class="text-2xl font-bold text-blue-400" id="stat-plates">-</div>
+          <div class="text-xs text-slate-500 mt-1">Unique Plates</div>
+        </div>
+      </div>
+
+      <section>
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-1 h-5 bg-red-500 rounded-full"></div>
+          <h3 class="text-lg font-semibold">Watchlist Hits</h3>
+          <span class="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full" id="watchlist-count">0</span>
+        </div>
+        <div id="watchlist-hits" class="space-y-3"></div>
+      </section>
+
+      <section>
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-1 h-5 bg-blue-500 rounded-full"></div>
+          <h3 class="text-lg font-semibold">All ANPR Detections</h3>
+          <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full" id="anpr-count">0</span>
+        </div>
+        <div id="anpr-detections" class="space-y-3"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+let prevWatchlistIds = new Set();
+let refreshInterval = null;
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleString('en-IN', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function priorityLabel(p) {
+  const labels = { '1': 'Critical', '2': 'High', '3': 'Medium', '4': 'Low' };
+  return labels[String(p)] || 'Unknown';
+}
+
+function priorityColor(p) {
+  const colors = { '1': 'text-red-400 bg-red-500/20 border-red-500/30', '2': 'text-orange-400 bg-orange-500/20 border-orange-500/30', '3': 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30', '4': 'text-slate-400 bg-slate-700 border-slate-600' };
+  return colors[String(p)] || 'text-slate-400 bg-slate-700 border-slate-600';
+}
+
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return s + 's ago';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  return h + 'h ago';
+}
+
+function emptyState(message) {
+  return '<div class="text-center py-10 text-slate-600 text-sm">' + message + '</div>';
+}
+
+async function acknowledgeAlert(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Acknowledging...';
+  try {
+    const res = await fetch('/api/watchlist/alerts/' + id + '/acknowledge', { method: 'POST' });
+    if (res.ok) {
+      fetchAll();
+    } else {
+      btn.textContent = 'Failed';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    btn.textContent = 'Error';
+    btn.disabled = false;
+  }
+}
+
+async function fetchAll() {
+  await Promise.all([fetchWatchlist(), fetchANPR()]);
+}
+
+async function fetchWatchlist() {
+  try {
+    const res = await fetch('/api/watchlist/alerts');
+    const data = await res.json();
+
+    const currentIds = new Set(data.map(a => a.id));
+    const isNew = (id) => !prevWatchlistIds.has(id);
+
+    document.getElementById('stat-total').textContent = data.length;
+    document.getElementById('stat-unack').textContent = data.filter(a => !a.acknowledged).length;
+
+    const uniquePlates = new Set(data.map(a => a.plate_number));
+    document.getElementById('stat-plates').textContent = uniquePlates.size;
+    document.getElementById('watchlist-count').textContent = data.length;
+
+    const container = document.getElementById('watchlist-hits');
+    if (data.length === 0) {
+      container.innerHTML = emptyState('No watchlist alerts yet. Matches will appear here in real time.');
+    } else {
+      const unacked = data.filter(a => !a.acknowledged);
+      const acked = data.filter(a => a.acknowledged);
+      const sorted = [...unacked, ...acked];
+
+      container.innerHTML = sorted.map(a => {
+        const flashClass = isNew(a.id) ? ' flash-new' : '';
+        return '<div class="bg-slate-900 border border-red-500/30 rounded-lg p-4 fade-in' + flashClass + '">' +
+          '<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">' +
+            '<div class="flex-1 min-w-0">' +
+              '<div class="flex items-center gap-3 flex-wrap">' +
+                '<span class="mono text-xl font-bold text-red-400 tracking-wider">' + a.plate_number + '</span>' +
+                '<span class="text-xs px-2 py-0.5 rounded border ' + priorityColor(a.priority) + '">' + priorityLabel(a.priority) + '</span>' +
+                (a.acknowledged ? '<span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400 border border-slate-600">Acknowledged</span>' : '<span class="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">New</span>') +
+              '</div>' +
+              '<div class="flex items-center gap-4 mt-2 text-sm text-slate-400 flex-wrap">' +
+                '<span class="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> ' + a.camera_name + '</span>' +
+                '<span>' + a.department + '</span>' +
+              '</div>' +
+              '<div class="mt-2 text-sm text-slate-500">' +
+                '<span class="text-slate-400">Owner:</span> ' + (a.owner_name || 'Unknown') +
+                ' <span class="mx-1">|</span> ' +
+                '<span class="text-slate-400">Reason:</span> ' + (a.reason || 'N/A') +
+                ' <span class="mx-1">|</span> ' +
+                '<span class="text-slate-400">Confidence:</span> ' + (a.confidence * 100).toFixed(1) + '%' +
+              '</div>' +
+              '<div class="mt-2 text-xs text-slate-600">' + a.timestamp + ' (' + timeAgo(a.timestamp) + ')</div>' +
+            '</div>' +
+            '<div class="shrink-0">' +
+              (!a.acknowledged
+                ? '<button onclick="acknowledgeAlert(' + a.id + ', this)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded transition">Acknowledge</button>'
+                : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    prevWatchlistIds = currentIds;
+  } catch (e) {
+    console.error('Failed to fetch watchlist alerts:', e);
+  }
+}
+
+async function fetchANPR() {
+  try {
+    const res = await fetch('/api/events?type=anpr&limit=50');
+    const data = await res.json();
+
+    document.getElementById('anpr-count').textContent = data.length;
+
+    const container = document.getElementById('anpr-detections');
+    if (data.length === 0) {
+      container.innerHTML = emptyState('No ANPR detections yet. Detection events will appear here in real time.');
+    } else {
+      container.innerHTML = data.map(e => {
+        return '<div class="bg-slate-900 border border-blue-500/20 rounded-lg p-3 fade-in">' +
+          '<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">' +
+            '<div class="flex items-center gap-4 flex-wrap">' +
+              '<span class="mono text-lg font-bold text-blue-400 tracking-wider">' + e.label + '</span>' +
+              '<span class="text-sm text-slate-400">' + e.camera_name + '</span>' +
+              '<span class="text-xs text-slate-600">' + e.department + '</span>' +
+              '<span class="text-xs text-blue-400">' + (e.confidence * 100).toFixed(1) + '%</span>' +
+            '</div>' +
+            '<div class="text-xs text-slate-600 shrink-0">' + e.timestamp + ' (' + timeAgo(e.timestamp) + ')</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    console.error('Failed to fetch ANPR events:', e);
+  }
+}
+
+fetchAll();
+refreshInterval = setInterval(fetchAll, 5000);
+</script>
+<script src="/static/spa.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel VMS - Unified Video Wall</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+    <style>
+        .leaflet-container { background: #020617 !important; }
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: #0f172a; color: #f8fafc; border: 1px solid #1e293b; border-radius: 8px;
+        }
+        .custom-popup .leaflet-popup-tip { background: #0f172a; }
+        .alert-flash { animation: flash 1s infinite; }
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .nav-link { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #94a3b8; text-decoration: none; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+        .nav-link:hover { background: #1e293b; color: #e2e8f0; }
+        .nav-link.active { background: #312e81; color: #818cf8; border: 1px solid #4338ca; }
+        #page-content .ml-\[52px\] { margin-left: 0 !important; }
+        #page-content { overflow-y: auto; }
+    </style>
+</head>
+<body class="h-full font-sans overflow-y-auto">
+
+    <header class="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-10 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></div>
+            <h1 class="text-base font-bold tracking-wider text-slate-100 uppercase">
+                Sentinel VMS <span class="text-xs px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800">Unified Command</span>
+            </h1>
+            <span id="watchlist-count-badge" class="hidden px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-800 text-[10px] font-mono font-bold"></span>
+        </div>
+        <div class="flex items-center space-x-3 text-xs font-mono">
+            <span id="live-events-badge" class="bg-emerald-950 text-emerald-400 px-3 py-1 rounded border border-emerald-800">
+                <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span>Events: <span id="events-count">0</span>
+            </span>
+            <span id="active-slots-badge" class="bg-emerald-950 text-emerald-400 px-3 py-1 rounded border border-emerald-800">Grid: 0/4 Active</span>
+            <span id="analytics-status-badge" class="bg-slate-800 text-slate-500 px-3 py-1 rounded border border-slate-700">YOLO: --</span>
+            <div class="relative inline-block text-left" id="export-dropdown-container">
+                <button onclick="toggleExportMenu()" class="bg-indigo-950 hover:bg-indigo-900 text-indigo-300 px-3 py-1 rounded border border-indigo-800 flex items-center gap-1 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Export
+                </button>
+                <div id="export-menu" class="hidden absolute right-0 mt-1 w-44 bg-slate-900 border border-slate-800 rounded-md shadow-lg py-1 z-50 text-slate-300">
+                    <a href="/api/export/events" class="block px-3 py-1.5 hover:bg-slate-800 text-xs">Events Log (CSV)</a>
+                    <a href="/api/export/anpr" class="block px-3 py-1.5 hover:bg-slate-800 text-xs">ANPR Report (CSV)</a>
+                    <a href="/api/export/violations" class="block px-3 py-1.5 hover:bg-slate-800 text-xs">Violations (CSV)</a>
+                    <a href="/api/export/detections" class="block px-3 py-1.5 hover:bg-slate-800 text-xs">Detections (CSV)</a>
+                    <a href="/api/export/watchlist" class="block px-3 py-1.5 hover:bg-slate-800 text-xs">Watchlist (CSV)</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="alert-flash-bar" class="hidden fixed top-14 left-0 right-0 z-50 bg-red-900/90 border-b border-red-700 px-4 py-2 flex items-center space-x-3 alert-flash">
+        <div class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></div>
+        <span class="text-red-200 text-xs font-bold uppercase tracking-wider">Watchlist Alert</span>
+        <span id="alert-flash-text" class="text-red-100 text-xs font-mono"></span>
+    </div>
+
+    <div id="main-area" style="display: flex; height: calc(100vh - 56px); overflow: auto;">
+
+        <nav class="w-[52px] h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center py-3 shrink-0 z-10">
+            <a href="/" class="nav-link active mb-3" title="Dashboard">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+            </a>
+            <a href="/watchlist" class="nav-link mb-3" title="Watchlist">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </a>
+            <a href="/vehicle-search" class="nav-link mb-3" title="Vehicle Search">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </a>
+            <a href="/anpr-alerts" class="nav-link mb-3" title="ANPR Alerts">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            </a>
+            <a href="/events" class="nav-link" title="Events">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </a>
+            <a href="/violations" class="nav-link" title="Violations">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </a>
+        </nav>
+
+        <div id="page-content" style="display: flex; flex: 1; height: 100%;">
+        <section class="w-[40%] h-full border-r border-slate-800 relative flex flex-col">
+            <div class="bg-slate-900 px-3 py-2 border-b border-slate-800 flex justify-between items-center text-xs font-semibold shrink-0">
+                <span class="text-slate-300">GIS Asset Map</span>
+                <span class="text-slate-500">Click marker to load feed into grid</span>
+            </div>
+            <div id="gis-map" class="flex-1 w-full h-full"></div>
+        </section>
+
+        <section class="w-[60%] h-full bg-slate-950 p-3 flex flex-col overflow-y-auto">
+            <div class="mb-2 flex justify-between items-center">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Control-Room Video Wall (2x2 Grid)</h2>
+                <span class="text-[11px] text-slate-500 font-mono">Direct Feed Ingestion (No Middleware)</span>
+            </div>
+
+            <div class="flex-1 grid grid-cols-2 grid-rows-2 gap-3">
+
+                <div class="bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden relative group">
+                    <div class="bg-slate-950 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center text-xs">
+                        <span id="title-slot-0" class="font-semibold text-slate-400">Slot 1: [ Empty Slot ]</span>
+                        <span id="badge-slot-0" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-500">OFFLINE</span>
+                    </div>
+                    <div class="flex-1 bg-black/80 flex items-center justify-center relative overflow-hidden">
+                        <div id="loading-slot-0" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 z-20 hidden">
+                            <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span class="text-slate-400 text-[11px] font-mono">Connecting...</span>
+                        </div>
+                        <video id="vid-slot-0" class="w-full h-full object-cover hidden" preload="auto" autoplay muted playsinline></video>
+                        <img id="analytics-img-slot-0" src="" class="w-full h-full object-cover hidden" alt="Analytics 0">
+                        <div id="placeholder-slot-0" class="text-slate-600 text-xs flex flex-col items-center space-y-1">
+                            <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span>Select Camera on Map</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/90 px-3 py-1.5 border-t border-slate-800 flex justify-between items-center text-[11px]">
+                        <span id="dept-slot-0" class="text-slate-500">Dept: --</span>
+                        <div class="flex items-center space-x-2">
+                            <button id="ai-btn-slot-0" onclick="toggleSlotAnalytics(0)" class="text-slate-500 hover:text-amber-400 font-semibold transition hidden">AI: OFF</button>
+                            <button onclick="clearSlot(0)" class="text-slate-500 hover:text-red-400 font-semibold transition">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden relative group">
+                    <div class="bg-slate-950 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center text-xs">
+                        <span id="title-slot-1" class="font-semibold text-slate-400">Slot 2: [ Empty Slot ]</span>
+                        <span id="badge-slot-1" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-500">OFFLINE</span>
+                    </div>
+                    <div class="flex-1 bg-black/80 flex items-center justify-center relative overflow-hidden">
+                        <div id="loading-slot-1" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 z-20 hidden">
+                            <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span class="text-slate-400 text-[11px] font-mono">Connecting...</span>
+                        </div>
+                        <video id="vid-slot-1" class="w-full h-full object-cover hidden" preload="auto" autoplay muted playsinline></video>
+                        <img id="analytics-img-slot-1" src="" class="w-full h-full object-cover hidden" alt="Analytics 1">
+                        <div id="placeholder-slot-1" class="text-slate-600 text-xs flex flex-col items-center space-y-1">
+                            <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span>Select Camera on Map</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/90 px-3 py-1.5 border-t border-slate-800 flex justify-between items-center text-[11px]">
+                        <span id="dept-slot-1" class="text-slate-500">Dept: --</span>
+                        <div class="flex items-center space-x-2">
+                            <button id="ai-btn-slot-1" onclick="toggleSlotAnalytics(1)" class="text-slate-500 hover:text-amber-400 font-semibold transition hidden">AI: OFF</button>
+                            <button onclick="clearSlot(1)" class="text-slate-500 hover:text-red-400 font-semibold transition">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden relative group">
+                    <div class="bg-slate-950 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center text-xs">
+                        <span id="title-slot-2" class="font-semibold text-slate-400">Slot 3: [ Empty Slot ]</span>
+                        <span id="badge-slot-2" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-500">OFFLINE</span>
+                    </div>
+                    <div class="flex-1 bg-black/80 flex items-center justify-center relative overflow-hidden">
+                        <div id="loading-slot-2" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 z-20 hidden">
+                            <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span class="text-slate-400 text-[11px] font-mono">Connecting...</span>
+                        </div>
+                        <video id="vid-slot-2" class="w-full h-full object-cover hidden" preload="auto" autoplay muted playsinline></video>
+                        <img id="analytics-img-slot-2" src="" class="w-full h-full object-cover hidden" alt="Analytics 2">
+                        <div id="placeholder-slot-2" class="text-slate-600 text-xs flex flex-col items-center space-y-1">
+                            <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span>Select Camera on Map</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/90 px-3 py-1.5 border-t border-slate-800 flex justify-between items-center text-[11px]">
+                        <span id="dept-slot-2" class="text-slate-500">Dept: --</span>
+                        <div class="flex items-center space-x-2">
+                            <button id="ai-btn-slot-2" onclick="toggleSlotAnalytics(2)" class="text-slate-500 hover:text-amber-400 font-semibold transition hidden">AI: OFF</button>
+                            <button onclick="clearSlot(2)" class="text-slate-500 hover:text-red-400 font-semibold transition">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden relative group">
+                    <div class="bg-slate-950 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center text-xs">
+                        <span id="title-slot-3" class="font-semibold text-slate-400">Slot 4: [ Empty Slot ]</span>
+                        <span id="badge-slot-3" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-500">OFFLINE</span>
+                    </div>
+                    <div class="flex-1 bg-black/80 flex items-center justify-center relative overflow-hidden">
+                        <div id="loading-slot-3" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 z-20 hidden">
+                            <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span class="text-slate-400 text-[11px] font-mono">Connecting...</span>
+                        </div>
+                        <video id="vid-slot-3" class="w-full h-full object-cover hidden" preload="auto" autoplay muted playsinline></video>
+                        <img id="analytics-img-slot-3" src="" class="w-full h-full object-cover hidden" alt="Analytics 3">
+                        <div id="placeholder-slot-3" class="text-slate-600 text-xs flex flex-col items-center space-y-1">
+                            <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span>Select Camera on Map</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/90 px-3 py-1.5 border-t border-slate-800 flex justify-between items-center text-[11px]">
+                        <span id="dept-slot-3" class="text-slate-500">Dept: --</span>
+                        <div class="flex items-center space-x-2">
+                            <button id="ai-btn-slot-3" onclick="toggleSlotAnalytics(3)" class="text-slate-500 hover:text-amber-400 font-semibold transition hidden">AI: OFF</button>
+                            <button onclick="clearSlot(3)" class="text-slate-500 hover:text-red-400 font-semibold transition">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="analytics-panel" class="mt-3 bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400">Live Detection Feed</h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-[10px] text-slate-500">Auto-refresh 3s</span>
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </div>
+                </div>
+                <div id="detections-container" class="max-h-32 overflow-y-auto space-y-1 text-[11px] font-mono">
+                    <div class="text-slate-500 italic">Connecting to detection feed...</div>
+                </div>
+            </div>
+
+            <div id="scene-panel" class="hidden mt-3 bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400">NVIDIA NIM Scene Analysis</h3>
+                    <button id="scene-analyze-btn" onclick="runSceneAnalysis()" class="hidden px-3 py-1 text-[10px] font-bold uppercase bg-purple-900 hover:bg-purple-800 text-purple-300 border border-purple-700 rounded transition">
+                        Analyze Scene
+                    </button>
+                </div>
+                <div id="scene-description" class="text-[11px] text-slate-400 italic">
+                    Enable AI on a camera to analyze the scene using NVIDIA NIM Vision Language Model.
+                </div>
+                <div id="scene-result" class="hidden mt-2 text-[11px] space-y-1"></div>
+            </div>
+        </section>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('gis-map', { preferCanvas: true }).setView([23.2156, 72.6369], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: ''
+        }).addTo(map);
+
+        const NUM_SLOTS = 4;
+        const gridState = new Array(NUM_SLOTS).fill(null);
+        const slotAnalytics = new Array(NUM_SLOTS).fill(false);
+        const hlsPlayers = new Array(NUM_SLOTS).fill(null);
+        let detectionPollInterval = null;
+        let cameraRegistry = {};
+        let routePolyline = null;
+        let routeMarkers = [];
+        let lastAlertTime = 0;
+        let alertPollInterval = null;
+
+        function updateActiveSlotsBadge() {
+            const count = gridState.filter(s => s !== null).length;
+            document.getElementById('active-slots-badge').innerText = `Grid: ${count}/${NUM_SLOTS} Active`;
+        }
+
+        function updateAnalyticsPanel() {
+            const anyActive = slotAnalytics.some(a => a);
+            const panel = document.getElementById('analytics-panel');
+            const scenePanel = document.getElementById('scene-panel');
+            const sceneBtn = document.getElementById('scene-analyze-btn');
+            if (anyActive) {
+                panel.classList.remove('hidden');
+                scenePanel.classList.remove('hidden');
+                sceneBtn.classList.remove('hidden');
+                if (!detectionPollInterval) {
+                    detectionPollInterval = setInterval(pollDetections, 3000);
+                    pollDetections();
+                }
+            } else {
+                panel.classList.add('hidden');
+                scenePanel.classList.add('hidden');
+                if (detectionPollInterval) {
+                    clearInterval(detectionPollInterval);
+                    detectionPollInterval = null;
+                }
+                document.getElementById('detections-container').innerHTML = '<div class="text-slate-500 italic">Enable AI on a grid camera to see detections.</div>';
+                document.getElementById('events-count').textContent = '0';
+                document.getElementById('scene-result').classList.add('hidden');
+                document.getElementById('scene-description').classList.remove('hidden');
+                document.getElementById('scene-description').textContent = 'Enable AI on a camera to analyze the scene using NVIDIA NIM Vision Language Model.';
+            }
+        }
+
+        function getActiveAnalyticsCamId() {
+            for (let i = 0; i < NUM_SLOTS; i++) {
+                if (slotAnalytics[i] && gridState[i]) return gridState[i];
+            }
+            return null;
+        }
+
+        async function runSceneAnalysis() {
+            const camId = getActiveAnalyticsCamId();
+            if (!camId) return;
+
+            const desc = document.getElementById('scene-description');
+            const result = document.getElementById('scene-result');
+            const btn = document.getElementById('scene-analyze-btn');
+
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            desc.textContent = 'Querying NVIDIA NIM Vision Language Model (meta/llama-3.2-11b-vision-instruct)...';
+            desc.classList.remove('hidden');
+            result.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/scene/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cam_id: camId })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    desc.textContent = 'Error: ' + data.error;
+                    return;
+                }
+
+                desc.classList.add('hidden');
+                result.classList.remove('hidden');
+
+                let html = '';
+                if (data.description) {
+                    html += '<div class="bg-slate-800 rounded p-2 border border-slate-700"><span class="text-purple-400 font-bold">Scene:</span> <span class="text-slate-200">' + escapeHtml(data.description) + '</span></div>';
+                }
+                if (data.lighting) html += '<div><span class="text-slate-500">Lighting:</span> <span class="text-slate-300">' + escapeHtml(data.lighting) + '</span></div>';
+                if (data.weather) html += '<div><span class="text-slate-500">Weather:</span> <span class="text-slate-300">' + escapeHtml(data.weather) + '</span></div>';
+                if (data.road_condition) html += '<div><span class="text-slate-500">Road:</span> <span class="text-slate-300">' + escapeHtml(data.road_condition) + '</span></div>';
+                if (data.processing_time_ms) html += '<div class="text-slate-600">Processed in ' + data.processing_time_ms.toFixed(0) + 'ms via NVIDIA NIM</div>';
+
+                result.innerHTML = html;
+            } catch (err) {
+                desc.textContent = 'Analysis failed: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyze Scene';
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        async function toggleSlotAnalytics(slotIdx) {
+            const camId = gridState[slotIdx];
+            if (!camId) return;
+
+            try {
+                const res = await fetch('/api/toggle_analytics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cam_id: camId })
+                });
+                const data = await res.json();
+                const newState = data.analytics_enabled;
+                slotAnalytics[slotIdx] = newState;
+
+                const btn = document.getElementById(`ai-btn-slot-${slotIdx}`);
+                const badge = document.getElementById(`badge-slot-${slotIdx}`);
+                const vid = document.getElementById(`vid-slot-${slotIdx}`);
+                const analyticsImg = document.getElementById(`analytics-img-slot-${slotIdx}`);
+
+                if (newState) {
+                    btn.innerText = 'AI: ON';
+                    btn.className = 'text-amber-400 hover:text-amber-300 font-semibold transition';
+                    badge.innerText = 'LIVE + AI';
+                    badge.className = 'px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-950 text-amber-400 border border-amber-800';
+                    hideLoading(slotIdx);
+                    if (analyticsImg) {
+                        analyticsImg.style.position = 'absolute';
+                        analyticsImg.style.inset = '0';
+                        analyticsImg.style.zIndex = '15';
+                        analyticsImg.classList.remove('hidden');
+                        analyticsImg.src = `/analytics_feed/${camId}`;
+                    }
+                } else {
+                    btn.innerText = 'AI: OFF';
+                    btn.className = 'text-slate-500 hover:text-amber-400 font-semibold transition';
+                    badge.innerText = 'LIVE';
+                    badge.className = 'px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800';
+                    if (analyticsImg) { analyticsImg.src = ''; analyticsImg.classList.add('hidden'); analyticsImg.style.position = ''; analyticsImg.style.inset = ''; analyticsImg.style.zIndex = ''; }
+                    const cam = cameraRegistry[camId];
+                    if (cam && cam.hls_url) {
+                        startHlsPlayer(slotIdx, cam.hls_url);
+                    } else {
+                        startMjpegFallback(slotIdx, camId);
+                    }
+                }
+
+                updateAnalyticsPanel();
+            } catch (err) {
+                console.error("[Analytics Toggle Error]", err);
+            }
+        }
+
+        async function pollDetections() {
+            try {
+                const gridCamIds = new Set(gridState.filter(s => s !== null));
+                const res = await fetch('/api/analytics/detections');
+                const entries = await res.json();
+                const container = document.getElementById('detections-container');
+                const counter = document.getElementById('events-count');
+
+                const filtered = entries.filter(e => gridCamIds.has(e.cam_id));
+                let totalDets = 0;
+                filtered.forEach(e => totalDets += (e.detections || []).length);
+                counter.textContent = totalDets;
+
+                if (filtered.length === 0) {
+                    container.innerHTML = '<div class="text-slate-500 italic">Detection pipeline active. Waiting for objects in camera feeds...</div>';
+                    return;
+                }
+
+                const allDets = [];
+                filtered.slice(-10).forEach(e => {
+                    (e.detections || []).forEach(d => {
+                        allDets.push({ ...d, cam_id: e.cam_id, timestamp: e.timestamp });
+                    });
+                });
+
+                container.innerHTML = allDets.slice(0, 20).map(d => {
+                    const time = d.timestamp ? new Date(d.timestamp * 1000).toLocaleTimeString() : '--';
+                    const cam = d.cam_id;
+                    const isPlate = d.class === 'plate';
+                    let icon = 'OBJ';
+                    let color = 'text-cyan-400';
+                    if (isPlate) { icon = 'PLATE'; color = 'text-purple-400'; }
+                    else if (d.class === 'person') { icon = 'PERSON'; color = 'text-amber-400'; }
+                    else if (d.class === 'car') { icon = 'CAR'; color = 'text-blue-400'; }
+                    else if (d.class === 'motorcycle') { icon = 'BIKE'; color = 'text-green-400'; }
+                    else if (d.class === 'bus') { icon = 'BUS'; color = 'text-orange-400'; }
+                    else if (d.class === 'truck') { icon = 'TRUCK'; color = 'text-red-400'; }
+                    else if (d.class === 'bicycle') { icon = 'CYCLE'; color = 'text-teal-400'; }
+                    const badge = isPlate
+                        ? '<span class="text-[9px] bg-purple-950 text-purple-400 border border-purple-800 px-1 rounded">PLATE</span>'
+                        : '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded">' + icon + '</span>';
+                    const conf = ((d.confidence || 0) * 100).toFixed(0);
+                    const plateText = d.plate_number ? ` [${d.plate_number}]` : '';
+                    return '<div class="flex items-center space-x-2 text-slate-300"><span class="text-slate-500 w-16">' + time + '</span><span class="text-indigo-400 w-20 truncate">Cam ' + cam + '</span>' + badge + '<span class="' + color + '">' + (d.class || '-') + plateText + ' (' + conf + '%)</span></div>';
+                }).join('');
+            } catch (err) {
+                console.error("[Detection Poll Error]", err);
+            }
+        }
+
+        function clearDetections() {
+            document.getElementById('detections-container').innerHTML = '<div class="text-slate-500 italic">No detections yet. Enable analytics and load a camera feed.</div>';
+        }
+
+        async function checkAnalyticsStatus() {
+            try {
+                const res = await fetch('/api/analytics/status');
+                const data = await res.json();
+
+                const yoloBadge = document.getElementById('analytics-status-badge');
+                yoloBadge.innerText = data.yolo_loaded ? 'YOLO: Ready' : 'YOLO: N/A';
+                yoloBadge.className = data.yolo_loaded
+                    ? 'bg-emerald-950 text-emerald-400 px-3 py-1 rounded border border-emerald-800'
+                    : 'bg-red-950 text-red-400 px-3 py-1 rounded border border-red-800';
+
+                if (data.active_cameras && data.active_cameras.length > 0) {
+                    for (let i = 0; i < NUM_SLOTS; i++) {
+                        if (gridState[i] && data.active_cameras.includes(gridState[i])) {
+                            slotAnalytics[i] = true;
+                            const btn = document.getElementById(`ai-btn-slot-${i}`);
+                            if (btn) {
+                                btn.innerText = 'AI: ON';
+                                btn.className = 'text-amber-400 hover:text-amber-300 font-semibold transition';
+                            }
+                            const badge = document.getElementById(`badge-slot-${i}`);
+                            if (badge) {
+                                badge.innerText = 'LIVE + AI';
+                                badge.className = 'px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-950 text-amber-400 border border-amber-800';
+                            }
+                        }
+                    }
+                    updateAnalyticsPanel();
+                }
+            } catch (err) {
+                console.error("[Analytics Status Error]", err);
+            }
+        }
+
+        function toggleExportMenu() {
+            const menu = document.getElementById('export-menu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', function(e) {
+            const container = document.getElementById('export-dropdown-container');
+            const menu = document.getElementById('export-menu');
+            if (container && menu && !container.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        async function loadGISRegistry() {
+            try {
+                const res = await fetch('/api/cameras');
+                const cameras = await res.json();
+                cameraRegistry = {};
+
+                cameras.forEach(cam => {
+                    cameraRegistry[cam.cam_id] = cam;
+                    const isOnline = cam.status === 'ONLINE';
+                    const isDegraded = cam.status === 'DEGRADED';
+                    let markerColor = '#ef4444';
+                    if (isOnline) markerColor = '#10b981';
+                    else if (isDegraded) markerColor = '#f59e0b';
+
+                    const borderWeight = isOnline ? 2 : 1;
+
+                    const marker = L.circleMarker([cam.latitude, cam.longitude], {
+                        radius: 8,
+                        fillColor: markerColor,
+                        color: markerColor,
+                        weight: borderWeight,
+                        fillOpacity: 0.85
+                    }).addTo(map);
+
+                    let statusCls = 'bg-red-950 text-red-400 border border-red-800';
+                    if (isOnline) statusCls = 'bg-emerald-950 text-emerald-400 border border-emerald-800';
+                    else if (isDegraded) statusCls = 'bg-amber-950 text-amber-400 border border-amber-800';
+
+                    let assignHtml = '';
+                    if (isOnline || isDegraded) {
+                        assignHtml = `
+                                <div class="pt-2 text-[10px] font-bold text-slate-400 uppercase">Assign to Video Wall Slot:</div>
+                                <div class="grid grid-cols-2 gap-1 pt-1">
+                                    <button onclick="assignToSlot(0, '${cam.cam_id}', '${cam.name.replace(/'/g, "\\'")}', '${cam.department.replace(/'/g, "\\'")}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 1</button>
+                                    <button onclick="assignToSlot(1, '${cam.cam_id}', '${cam.name.replace(/'/g, "\\'")}', '${cam.department.replace(/'/g, "\\'")}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 2</button>
+                                    <button onclick="assignToSlot(2, '${cam.cam_id}', '${cam.name.replace(/'/g, "\\'")}', '${cam.department.replace(/'/g, "\\'")}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 3</button>
+                                    <button onclick="assignToSlot(3, '${cam.cam_id}', '${cam.name.replace(/'/g, "\\'")}', '${cam.department.replace(/'/g, "\\'")}')" class="bg-slate-800 hover:bg-indigo-600 text-slate-200 py-1 px-2 rounded border border-slate-700 transition">Slot 4</button>
+                                </div>`;
+                    } else {
+                        assignHtml = '<div class="text-red-400 italic mt-1">Feed Offline - Unavailable</div>';
+                    }
+
+                    const popupHtml = `
+                        <div class="p-1 text-xs space-y-1">
+                            <div class="font-bold text-slate-100">${cam.name}</div>
+                            <div class="text-slate-400">Dept: <span class="text-indigo-400 font-semibold">${cam.department}</span></div>
+                            <div class="text-slate-400">ID: ${cam.cam_id} | Codec: ${cam.codec}</div>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${statusCls}">${cam.status}</span>
+                            </div>
+                            ${assignHtml}
+                        </div>
+                    `;
+                    marker.bindPopup(popupHtml, { className: 'custom-popup' });
+                });
+            } catch (err) {
+                console.error("[GIS Error]", err);
+            }
+        }
+
+        function stopHlsPlayer(slotIdx) {
+            if (hlsPlayers[slotIdx]) {
+                hlsPlayers[slotIdx].destroy();
+                hlsPlayers[slotIdx] = null;
+            }
+            const vid = document.getElementById(`vid-slot-${slotIdx}`);
+            if (vid) { vid.src = ''; vid.load(); }
+        }
+
+        function startMjpegFallback(slotIdx, camId) {
+            const vid = document.getElementById(`vid-slot-${slotIdx}`);
+            const analyticsImg = document.getElementById(`analytics-img-slot-${slotIdx}`);
+            if (!camId) return;
+            if (vid) vid.classList.add('hidden');
+            if (analyticsImg) {
+                analyticsImg.onload = () => hideLoading(slotIdx);
+                analyticsImg.onerror = () => hideLoading(slotIdx);
+                analyticsImg.classList.remove('hidden');
+                analyticsImg.src = `/video_feed/${camId}`;
+            }
+        }
+
+        function stopMjpegFallback(slotIdx) {
+            const analyticsImg = document.getElementById(`analytics-img-slot-${slotIdx}`);
+            if (analyticsImg) {
+                analyticsImg.src = '';
+                analyticsImg.classList.add('hidden');
+                analyticsImg.style.position = '';
+                analyticsImg.style.inset = '';
+                analyticsImg.style.zIndex = '';
+            }
+        }
+
+        function startHlsPlayer(slotIdx, hlsUrl, retryCount) {
+            stopHlsPlayer(slotIdx);
+            const vid = document.getElementById(`vid-slot-${slotIdx}`);
+            if (!vid) return;
+
+            retryCount = retryCount || 0;
+            const MAX_RETRIES = 2;
+
+            vid.onplaying = () => hideLoading(slotIdx);
+            vid.oncanplaythrough = () => hideLoading(slotIdx);
+
+            const camId = gridState[slotIdx];
+            const cam = cameraRegistry[camId];
+
+            if (Hls.isSupported() && hlsUrl) {
+                const hls = new Hls({
+                    liveSyncDurationCount: 2,
+                    liveMaxLatencyDurationCount: 6,
+                    liveDurationInfinity: true,
+                    lowLatencyMode: true,
+                    maxBufferLength: 8,
+                    maxMaxBufferLength: 20,
+                    manifestLoadingTimeOut: 8000,
+                    manifestLoadingMaxRetry: 2,
+                    enableWorker: true,
+                    backBufferLength: 30,
+                });
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(vid);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    vid.play().catch(() => {});
+                });
+                hls.on(Hls.Events.ERROR, (e, data) => {
+                    if (data.fatal) {
+                        hls.destroy();
+                        hlsPlayers[slotIdx] = null;
+                        if (retryCount < MAX_RETRIES) {
+                            setTimeout(() => startHlsPlayer(slotIdx, hlsUrl, retryCount + 1), 2000);
+                        } else {
+                            console.warn(`[Stream] HLS unavailable for slot ${slotIdx}, falling back to MJPEG for ${camId}`);
+                            startMjpegFallback(slotIdx, camId);
+                        }
+                    }
+                });
+                hlsPlayers[slotIdx] = hls;
+                return;
+            }
+
+            if (cam && cam.fallback_url) {
+                startProgressiveStream(slotIdx, cam.fallback_url);
+                return;
+            }
+
+            if (vid.canPlayType('application/vnd.apple.mpegurl') && hlsUrl) {
+                vid.src = hlsUrl;
+                vid.play().catch(() => {});
+                return;
+            }
+
+            startMjpegFallback(slotIdx, camId);
+        }
+
+        function startProgressiveStream(slotIdx, streamUrl) {
+            const vid = document.getElementById(`vid-slot-${slotIdx}`);
+            if (!vid || !streamUrl) return;
+            vid.src = streamUrl;
+            vid.load();
+            vid.play().catch(() => {});
+        }
+
+        function hideLoading(slotIdx) {
+            const el = document.getElementById(`loading-slot-${slotIdx}`);
+            if (el) el.classList.add('hidden');
+        }
+
+        function assignToSlot(slotIdx, camId, name, department) {
+            clearSlot(slotIdx);
+
+            gridState[slotIdx] = camId;
+
+            const vid = document.getElementById(`vid-slot-${slotIdx}`);
+            const placeholder = document.getElementById(`placeholder-slot-${slotIdx}`);
+            const title = document.getElementById(`title-slot-${slotIdx}`);
+            const badge = document.getElementById(`badge-slot-${slotIdx}`);
+            const dept = document.getElementById(`dept-slot-${slotIdx}`);
+            const aiBtn = document.getElementById(`ai-btn-slot-${slotIdx}`);
+            const analyticsImg = document.getElementById(`analytics-img-slot-${slotIdx}`);
+
+            title.innerText = `${name} (${camId})`;
+            dept.innerText = `Dept: ${department}`;
+
+            badge.innerText = 'LIVE';
+            badge.className = 'px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800';
+
+            placeholder.classList.add('hidden');
+
+            const cam = cameraRegistry[camId];
+            const loadingEl = document.getElementById(`loading-slot-${slotIdx}`);
+            if (loadingEl) loadingEl.classList.remove('hidden');
+
+            if (analyticsImg) {
+                analyticsImg.onload = () => hideLoading(slotIdx);
+                analyticsImg.onerror = () => hideLoading(slotIdx);
+            }
+            if (vid) {
+                vid.onplaying = () => hideLoading(slotIdx);
+                vid.onwaiting = () => { vid.style.outline = '2px solid #f59e0b'; };
+                vid.oncanplay = () => { vid.style.outline = 'none'; };
+                vid.oncanplaythrough = () => hideLoading(slotIdx);
+            }
+
+            if (cam && cam.hls_url && Hls.isSupported()) {
+                vid.classList.remove('hidden');
+                startHlsPlayer(slotIdx, cam.hls_url);
+            } else if (cam && cam.fallback_url) {
+                vid.classList.remove('hidden');
+                startProgressiveStream(slotIdx, cam.fallback_url);
+            } else {
+                startMjpegFallback(slotIdx, camId);
+            }
+
+            setTimeout(() => hideLoading(slotIdx), 5000);
+
+            aiBtn.classList.remove('hidden');
+            aiBtn.innerText = 'AI: OFF';
+            aiBtn.className = 'text-slate-500 hover:text-amber-400 font-semibold transition';
+
+            slotAnalytics[slotIdx] = false;
+            updateActiveSlotsBadge();
+            updateAnalyticsPanel();
+
+            fetch('/api/grid/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cam_id: camId, slot: slotIdx })
+            }).catch(err => console.error("[Grid Assign Error]", err));
+        }
+
+        function clearSlot(slotIdx) {
+            const camId = gridState[slotIdx];
+
+            if (camId && slotAnalytics[slotIdx]) {
+                fetch('/api/toggle_analytics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cam_id: camId })
+                }).catch(() => {});
+                slotAnalytics[slotIdx] = false;
+            }
+
+            stopHlsPlayer(slotIdx);
+            stopMjpegFallback(slotIdx);
+            gridState[slotIdx] = null;
+
+            const vid = document.getElementById(`vid-slot-${slotIdx}`);
+            const placeholder = document.getElementById(`placeholder-slot-${slotIdx}`);
+            const title = document.getElementById(`title-slot-${slotIdx}`);
+            const badge = document.getElementById(`badge-slot-${slotIdx}`);
+            const dept = document.getElementById(`dept-slot-${slotIdx}`);
+            const aiBtn = document.getElementById(`ai-btn-slot-${slotIdx}`);
+            const loadingEl = document.getElementById(`loading-slot-${slotIdx}`);
+
+            vid.classList.add('hidden');
+            placeholder.classList.remove('hidden');
+            if (loadingEl) loadingEl.classList.add('hidden');
+
+            title.innerText = `Slot ${slotIdx + 1}: [ Empty Slot ]`;
+            dept.innerText = "Dept: --";
+            badge.innerText = "OFFLINE";
+            badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-500";
+
+            aiBtn.classList.add('hidden');
+            aiBtn.innerText = 'AI: OFF';
+            aiBtn.className = 'text-slate-500 hover:text-amber-400 font-semibold transition';
+
+            updateActiveSlotsBadge();
+            updateAnalyticsPanel();
+
+            fetch('/api/grid/clear/' + slotIdx, { method: 'POST' }).catch(() => {});
+        }
+
+        async function pollWatchlistAlerts() {
+            try {
+                const res = await fetch('/api/watchlist/alerts?unack_only=true&limit=5');
+                const alerts = await res.json();
+
+                alerts.forEach(a => {
+                    if (a.acknowledged) return;
+                    const alertTime = new Date(a.timestamp.replace(' ', 'T') + 'Z').getTime() / 1000;
+                    if (alertTime <= lastAlertTime) return;
+                    showWatchlistAlert(a.plate_number, a.cam_id, a.timestamp, a.owner_name, a.reason);
+                    lastAlertTime = alertTime;
+                });
+            } catch (err) {}
+        }
+
+        function showWatchlistAlert(plate, camId, timestamp, owner, reason) {
+            const bar = document.getElementById('alert-flash-bar');
+            const text = document.getElementById('alert-flash-text');
+            const time = new Date(timestamp.replace(' ', 'T') + 'Z').toLocaleString();
+            text.textContent = `WATCHLIST: "${plate}" detected at camera [${camId}] at ${time}${owner ? ' | Owner: ' + owner : ''}`;
+            bar.classList.remove('hidden');
+            bar.classList.add('alert-flash');
+            setTimeout(() => {
+                bar.classList.add('hidden');
+                bar.classList.remove('alert-flash');
+            }, 8000);
+        }
+
+        function initSSE() {
+            if (window.EventSource) {
+                try {
+                    const es = new EventSource('/api/events/stream');
+                    es.onmessage = function(e) {
+                        try {
+                            const data = JSON.parse(e.data);
+                            if (data.type === 'watchlist_alerts' && data.alerts && data.alerts.length > 0) {
+                                const a = data.alerts[0];
+                                showWatchlistAlert(a.plate_number, a.cam_id, a.timestamp, a.owner_name, a.reason);
+                            }
+                        } catch(err) {}
+                    };
+                } catch(err) {}
+            }
+        }
+
+        loadGISRegistry();
+        checkAnalyticsStatus();
+        updateAnalyticsPanel();
+        initSSE();
+
+        async function restoreGrid() {
+            try {
+                const res = await fetch('/api/grid/cameras');
+                const data = await res.json();
+                for (const cam of data.cameras) {
+                    assignToSlot(cam.grid_slot, cam.cam_id, cam.name, cam.department);
+                    if (cam.analytics_enabled) {
+                        const btn = document.getElementById(`ai-btn-slot-${cam.grid_slot}`);
+                        if (btn) {
+                            btn.innerText = 'AI: ON';
+                            btn.className = 'text-amber-400 hover:text-amber-300 font-semibold transition';
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("[Grid Restore Error]", err);
+            }
+        }
+        restoreGrid();
+
+        lastAlertTime = Math.floor(Date.now() / 1000);
+        alertPollInterval = setInterval(pollWatchlistAlerts, 5000);
+    </script>
+    <script src="/static/spa.js"></script>
+</body>
+</html>

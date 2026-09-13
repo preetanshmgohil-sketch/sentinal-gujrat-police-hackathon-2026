@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Watchlist - Sentinel VMS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .nav-link { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #94a3b8; text-decoration: none; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+        .nav-link:hover { background: #1e293b; color: #e2e8f0; }
+        .nav-link.active { background: #312e81; color: #818cf8; border: 1px solid #4338ca; }
+    </style>
+</head>
+<body class="h-full font-sans bg-slate-950 text-slate-100">
+    <header class="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-10 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></div>
+            <h1 class="text-base font-bold tracking-wider text-slate-100 uppercase">
+                Sentinel VMS <span class="text-xs px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800">Unified Command</span>
+            </h1>
+        </div>
+        <div class="flex items-center space-x-4 text-xs font-mono">
+            <span class="bg-slate-800 text-slate-300 px-3 py-1 rounded border border-slate-700">Multi-Dept Feeds: Active</span>
+        </div>
+    </header>
+    <div style="display: flex; height: calc(100vh - 56px); overflow: auto;">
+        <nav class="w-[52px] h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center py-3 shrink-0 z-10">
+            <a href="/" class="nav-link mb-3" title="Dashboard">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+            </a>
+            <a href="/watchlist" class="nav-link mb-3 active" title="Watchlist">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </a>
+            <a href="/vehicle-search" class="nav-link mb-3" title="Vehicle Search">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </a>
+            <a href="/anpr-alerts" class="nav-link mb-3" title="ANPR Alerts">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            </a>
+            <a href="/events" class="nav-link" title="Events">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </a>
+            <a href="/violations" class="nav-link" title="Violations">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </a>
+        </nav>
+        <div id="page-content" class="flex-1 overflow-y-auto p-6">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-red-400">Vehicle Watchlist</h2>
+                    <p class="text-sm text-slate-400 mt-1">Manage tracked vehicles and plates</p>
+                </div>
+                <button onclick="toggleWatchlistForm()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors">
+                    + Add Plate
+                </button>
+            </div>
+
+            <div id="watchlist-form" class="hidden mb-6 bg-slate-900 border border-slate-700 rounded-lg p-5">
+                <h3 class="text-sm font-semibold text-slate-200 mb-4">Add to Watchlist</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Plate Number</label>
+                        <input type="text" id="wl-plate" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500" placeholder="e.g. GJ01AB1234">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Owner Name</label>
+                        <input type="text" id="wl-owner" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500" placeholder="Owner name">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Vehicle Type</label>
+                        <select id="wl-type" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                            <option value="car">Car</option>
+                            <option value="truck">Truck</option>
+                            <option value="bike">Bike</option>
+                            <option value="bus">Bus</option>
+                            <option value="auto">Auto</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Priority</label>
+                        <select id="wl-priority" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2 md:col-span-2">
+                        <label class="block text-xs text-slate-400 mb-1">Reason</label>
+                        <input type="text" id="wl-reason" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500" placeholder="Why is this vehicle being tracked?">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button onclick="toggleWatchlistForm()" class="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+                    <button onclick="addWatchlistEntry()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors">Add to Watchlist</button>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-slate-200">Tracked Plates</h3>
+                    <button onclick="loadWatchlist()" class="text-xs text-slate-400 hover:text-slate-200 transition-colors">Refresh</button>
+                </div>
+                <div id="watchlist-table" class="divide-y divide-slate-800">
+                    <div class="px-5 py-8 text-center text-sm text-slate-500">Loading watchlist...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleWatchlistForm() {
+            document.getElementById('watchlist-form').classList.toggle('hidden');
+        }
+
+        function getPriorityClasses(priority) {
+            const map = {
+                low: 'bg-slate-700 text-slate-300',
+                medium: 'bg-yellow-900 text-yellow-400 border border-yellow-700',
+                high: 'bg-orange-900 text-orange-400 border border-orange-700',
+                critical: 'bg-red-900 text-red-400 border border-red-700'
+            };
+            return map[priority] || map.low;
+        }
+
+        async function loadWatchlist() {
+            const container = document.getElementById('watchlist-table');
+            try {
+                const res = await fetch('/api/watchlist');
+                const data = await res.json();
+                if (!data.length) {
+                    container.innerHTML = '<div class="px-5 py-8 text-center text-sm text-slate-500">No vehicles in watchlist</div>';
+                    return;
+                }
+                container.innerHTML = data.map(item => `
+                    <div class="px-5 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 font-mono text-sm font-bold text-slate-100">${item.plate}</div>
+                            <div>
+                                <p class="text-sm font-medium text-slate-200">${item.owner || 'Unknown'}</p>
+                                <p class="text-xs text-slate-500">${item.vehicle_type || 'N/A'} &middot; ${item.reason || 'No reason given'}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-xs px-2 py-1 rounded ${getPriorityClasses(item.priority)}">${item.priority}</span>
+                            <span class="text-xs text-slate-500 font-mono">${item.created_at ? new Date(item.created_at).toLocaleString() : ''}</span>
+                            <button onclick="deleteWatchlistEntry('${item.plate}')" class="text-red-500 hover:text-red-400 text-xs font-semibold px-2 py-1 rounded hover:bg-red-950 transition-colors">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<div class="px-5 py-8 text-center text-sm text-red-400">Failed to load watchlist</div>';
+            }
+        }
+
+        async function addWatchlistEntry() {
+            const plate = document.getElementById('wl-plate').value.trim();
+            const owner = document.getElementById('wl-owner').value.trim();
+            const vehicle_type = document.getElementById('wl-type').value;
+            const priority = document.getElementById('wl-priority').value;
+            const reason = document.getElementById('wl-reason').value.trim();
+
+            if (!plate) { alert('Plate number is required'); return; }
+
+            try {
+                const res = await fetch('/api/watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plate, owner, vehicle_type, priority, reason })
+                });
+                if (res.ok) {
+                    document.getElementById('wl-plate').value = '';
+                    document.getElementById('wl-owner').value = '';
+                    document.getElementById('wl-reason').value = '';
+                    toggleWatchlistForm();
+                    loadWatchlist();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to add entry');
+                }
+            } catch (e) {
+                alert('Error adding to watchlist');
+            }
+        }
+
+        async function deleteWatchlistEntry(plate) {
+            if (!confirm('Remove ' + plate + ' from watchlist?')) return;
+            try {
+                await fetch('/api/watchlist/' + encodeURIComponent(plate), { method: 'DELETE' });
+                loadWatchlist();
+            } catch (e) {
+                alert('Error deleting entry');
+            }
+        }
+
+        loadWatchlist();
+    </script>
+    <script src="/static/spa.js"></script>
+</body>
+</html>

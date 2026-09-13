@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel VMS | Vehicle Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap");
+        body { font-family: "Inter", sans-serif; }
+        .font-mono { font-family: "JetBrains Mono", monospace; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .timeline-line { position: absolute; left: 19px; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, #3b82f6, #8b5cf6); }
+        .cam-bar { transition: width 0.5s ease-out; }
+        .leaflet-popup-content-wrapper { background: #1e293b; color: #e2e8f0; border-radius: 8px; }
+        .leaflet-popup-tip { background: #1e293b; }
+        .leaflet-popup-close-button { color: #94a3b8; }
+        .leaflet-popup-close-button:hover { color: #e2e8f0; }
+        .leaflet-control-zoom a { background: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
+        .leaflet-control-zoom a:hover { background: #334155 !important; }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sentinel: { 50:"#f0f9ff",100:"#e0f2fe",200:"#bae6fd",300:"#7dd3fc",400:"#38bdf8",500:"#0ea5e9",600:"#0284c7",700:"#0369a1",800:"#075985",900:"#0c4a6e",950:"#082f49" }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex">
+    <nav class="w-[52px] bg-slate-900 border-r border-slate-800 flex flex-col items-center py-3 fixed h-full z-50">
+        <div class="w-8 h-8 bg-sentinel-600 rounded-lg flex items-center justify-center mb-6">
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+        </div>
+        <div class="flex flex-col gap-1 flex-1">
+            <a href="/" class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors" title="Dashboard">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 12a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1v-7z"/>
+                </svg>
+            </a>
+            <a href="/watchlist" class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors" title="Watchlist">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19H18.93c1.1 0 1.99-.89 1.99-1.99v0c0-1.1-.89-1.99-1.99-1.99L5.07 5.08c-1.1 0-1.99.89-1.99 1.99v0c0 1.1.89 1.99 1.99 1.99z"/>
+                </svg>
+            </a>
+            <a href="/vehicle-search" class="w-10 h-10 flex items-center justify-center rounded-lg bg-sentinel-600/20 text-sentinel-400 border border-sentinel-600/30" title="Vehicle Search">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </a>
+            <a href="/anpr-alerts" class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors" title="ANPR Alerts">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+            </a>
+            <a href="/events" class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors" title="Events">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </a>
+            <a href="/violations" class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors" title="Violations">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </a>
+        </div>
+    </nav>
+    <main id="page-content" class="flex-1 ml-[52px] min-h-screen">
+        <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-sentinel-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                </div>
+                <h1 class="text-lg font-semibold text-slate-100">Sentinel VMS <span class="text-slate-500 font-normal">| Unified Command</span></h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-xs text-slate-500" id="currentTime"></span>
+            </div>
+        </header>
+
+        <div class="p-6 space-y-6">
+            <!-- Search Section -->
+            <div class="relative">
+                <div class="flex gap-3">
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <svg class="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Enter plate number (e.g. GJ06DB4378)"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sentinel-500 focus:border-transparent font-mono text-lg tracking-wider"
+                            autocomplete="off"
+                        >
+                        <div id="suggestionsDropdown" class="hidden absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl z-50 max-h-72 overflow-y-auto"></div>
+                    </div>
+                    <button
+                        id="searchBtn"
+                        onclick="performSearch()"
+                        class="px-8 py-3.5 bg-sentinel-600 hover:bg-sentinel-500 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Search
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fuzzy Match Notice -->
+            <div id="fuzzyNotice" class="hidden bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+                <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86l-8.6 14.86A2 2 0 003.4 21h17.2a2 2 0 001.71-3.28l-8.6-14.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                <span class="text-amber-300 text-sm">No exact match found. Showing closest result: <span id="fuzzyPlate" class="font-mono font-semibold"></span></span>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="hidden flex items-center justify-center py-16">
+                <div class="flex items-center gap-3 text-slate-400">
+                    <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm">Searching plate database...</span>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-16">
+                <svg class="w-16 h-16 text-slate-700 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                </svg>
+                <p class="text-slate-500 text-lg">Enter a plate number to search</p>
+                <p class="text-slate-600 text-sm mt-1">Search by registration plate to view vehicle history and route</p>
+            </div>
+
+            <!-- No Results State -->
+            <div id="noResultsState" class="hidden text-center py-16">
+                <svg class="w-16 h-16 text-slate-700 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                </svg>
+                <p class="text-slate-500 text-lg">No results found</p>
+                <p class="text-slate-600 text-sm mt-1">No vehicle with plate "<span id="noResultsPlate" class="font-mono"></span>" was found in the system</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-4">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="text-red-300 text-sm" id="errorMessage">An error occurred</span>
+                </div>
+            </div>
+            <!-- Results Container -->
+            <div id="resultsContainer" class="hidden space-y-6">
+                <!-- Summary Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                    <div class="flex items-start justify-between flex-wrap gap-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 bg-sentinel-600/20 border border-sentinel-600/30 rounded-xl flex items-center justify-center">
+                                <svg class="w-7 h-7 text-sentinel-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8m-8 4h8m-6 4h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-bold font-mono tracking-wider text-white" id="summaryPlate">--</h2>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span id="matchTypeBadge" class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 hidden">Exact Match</span>
+                                    <span id="watchlistBadge" class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 hidden">On Watchlist</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-6 text-sm">
+                            <div class="text-center">
+                                <p class="text-2xl font-bold text-white" id="summaryDetections">0</p>
+                                <p class="text-slate-500">Detections</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-2xl font-bold text-white" id="summaryCameras">0</p>
+                                <p class="text-slate-500">Cameras</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xs text-slate-500">First Seen</p>
+                                <p class="text-sm text-slate-300 font-mono" id="summaryFirstSeen">--</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xs text-slate-500">Last Seen</p>
+                                <p class="text-sm text-slate-300 font-mono" id="summaryLastSeen">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Watchlist Details -->
+                <div id="watchlistPanel" class="hidden bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
+                    <h3 class="text-sm font-semibold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19H18.93c1.1 0 1.99-.89 1.99-1.99v0c0-1.1-.89-1.99-1.99-1.99L5.07 5.08c-1.1 0-1.99.89-1.99 1.99v0c0 1.1.89 1.99 1.99 1.99z"/>
+                        </svg>
+                        Watchlist Information
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <p class="text-xs text-slate-500">Owner</p>
+                            <p class="text-sm text-slate-200" id="watchlistOwner">--</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500">Vehicle Type</p>
+                            <p class="text-sm text-slate-200" id="watchlistType">--</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500">Priority</p>
+                            <p class="text-sm text-slate-200" id="watchlistPriority">--</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500">Reason</p>
+                            <p class="text-sm text-slate-200" id="watchlistReason">--</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera Frequency & Route Map Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Camera Frequency -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                            Camera Frequency
+                        </h3>
+                        <div id="cameraFrequency" class="space-y-3"></div>
+                    </div>
+
+                    <!-- Route Map -->
+                    <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                            </svg>
+                            Route Map
+                        </h3>
+                        <div id="routeMap" class="h-[400px] rounded-xl overflow-hidden bg-slate-800"></div>
+                        <p class="text-xs text-slate-500 mt-3" id="routeSummary"></p>
+                    </div>
+                </div>
+
+                <!-- Movement Timeline -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Movement Timeline
+                    </h3>
+                    <div id="movementTimeline" class="relative pl-10 space-y-6"></div>
+                </div>
+
+                <!-- Detection History Table -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        Detection History
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-800">
+                                    <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">#</th>
+                                    <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Camera</th>
+                                    <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Confidence</th>
+                                    <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Timestamp</th>
+                                    <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Watchlist</th>
+                                    <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Alert</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detectionTableBody" class="divide-y divide-slate-800/50">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script>
+        let map = null;
+        let routeLayer = null;
+        let debounceTimer = null;
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('en-US', {
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsDropdown = document.getElementById('suggestionsDropdown');
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const query = this.value.trim();
+            if (query.length < 2) {
+                suggestionsDropdown.classList.add('hidden');
+                return;
+            }
+            debounceTimer = setTimeout(() => fetchSuggestions(query), 250);
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                suggestionsDropdown.classList.add('hidden');
+                performSearch();
+            }
+            if (e.key === 'Escape') {
+                suggestionsDropdown.classList.add('hidden');
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!suggestionsDropdown.contains(e.target) && e.target !== searchInput) {
+                suggestionsDropdown.classList.add('hidden');
+            }
+        });
+
+        async function fetchSuggestions(query) {
+            try {
+                const resp = await fetch(`/api/plates/suggest?q=${encodeURIComponent(query)}`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!data || data.length === 0) {
+                    suggestionsDropdown.classList.add('hidden');
+                    return;
+                }
+                suggestionsDropdown.innerHTML = data.map(item => `
+                    <div class="px-4 py-2.5 cursor-pointer hover:bg-slate-800 transition-colors flex items-center justify-between"
+                         onclick="selectSuggestion('${item.plate_number}')">
+                        <span class="font-mono text-slate-200 tracking-wider">${item.plate_number}</span>
+                        <span class="text-xs text-slate-500">${item.cnt} detections</span>
+                    </div>
+                `).join('');
+                suggestionsDropdown.classList.remove('hidden');
+            } catch (err) {
+                suggestionsDropdown.classList.add('hidden');
+            }
+        }
+
+        function selectSuggestion(plate) {
+            searchInput.value = plate;
+            suggestionsDropdown.classList.add('hidden');
+            performSearch();
+        }
+
+        function showState(state) {
+            ['emptyState','loadingState','noResultsState','errorState','resultsContainer','fuzzyNotice'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            if (state) document.getElementById(state).classList.remove('hidden');
+        }
+
+        async function performSearch() {
+            const plate = searchInput.value.trim().toUpperCase();
+            if (!plate) { showState('emptyState'); return; }
+            searchInput.value = plate;
+            showState('loadingState');
+            try {
+                const resp = await fetch(`/api/vehicles/search/${encodeURIComponent(plate)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (!data || data.match_type === 'none' || !data.plate_number) {
+                    document.getElementById('noResultsPlate').textContent = plate;
+                    showState('noResultsState');
+                    return;
+                }
+                renderResults(data);
+            } catch (err) {
+                document.getElementById('errorMessage').textContent = `Search failed: ${err.message}`;
+                showState('errorState');
+            }
+        }
+
+        function renderResults(data) {
+            showState('resultsContainer');
+            if (data.match_type === 'fuzzy') {
+                document.getElementById('fuzzyPlate').textContent = data.plate_number;
+                document.getElementById('fuzzyNotice').classList.remove('hidden');
+            }
+            document.getElementById('summaryPlate').textContent = data.plate_number;
+            document.getElementById('summaryDetections').textContent = data.total_detections || 0;
+            document.getElementById('summaryCameras').textContent = (data.cameras || []).length;
+            document.getElementById('summaryFirstSeen').textContent = data.first_seen || '--';
+            document.getElementById('summaryLastSeen').textContent = data.last_seen || '--';
+
+            const matchBadge = document.getElementById('matchTypeBadge');
+            if (data.match_type === 'exact') {
+                matchBadge.classList.remove('hidden');
+            } else {
+                matchBadge.classList.add('hidden');
+            }
+
+            const wlBadge = document.getElementById('watchlistBadge');
+            const wlPanel = document.getElementById('watchlistPanel');
+            if (data.is_on_watchlist && data.watchlist_info) {
+                wlBadge.classList.remove('hidden');
+                wlPanel.classList.remove('hidden');
+                document.getElementById('watchlistOwner').textContent = data.watchlist_info.owner_name || '--';
+                document.getElementById('watchlistType').textContent = data.watchlist_info.vehicle_type || '--';
+                document.getElementById('watchlistPriority').textContent = data.watchlist_info.priority != null ? `Level ${data.watchlist_info.priority}` : '--';
+                document.getElementById('watchlistReason').textContent = data.watchlist_info.reason || '--';
+            } else {
+                wlBadge.classList.add('hidden');
+                wlPanel.classList.add('hidden');
+            }
+
+            renderCameraFrequency(data.cameras || []);
+            renderRouteMap(data.route || [], data.cameras || []);
+            renderTimeline(data.movement_history || []);
+            renderDetectionTable(data.detections || []);
+        }
+        function renderCameraFrequency(cameras) {
+            const container = document.getElementById('cameraFrequency');
+            if (!cameras.length) {
+                container.innerHTML = '<p class="text-slate-600 text-sm">No camera data</p>';
+                return;
+            }
+            const sorted = [...cameras].sort((a, b) => (b.detection_count || 0) - (a.detection_count || 0));
+            const maxCount = Math.max(...sorted.map(c => c.detection_count || 1));
+            container.innerHTML = sorted.map(cam => {
+                const pct = ((cam.detection_count || 0) / maxCount * 100);
+                return `
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-slate-300 font-medium truncate">${cam.name || cam.cam_id}</span>
+                            <span class="text-xs text-slate-500 font-mono">${cam.detection_count || 0}</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-2">
+                            <div class="cam-bar h-2 rounded-full bg-sentinel-500" style="width: ${pct}%"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function renderRouteMap(route, cameras) {
+            const mapEl = document.getElementById('routeMap');
+            if (map) {
+                map.remove();
+                map = null;
+            }
+            if (!route.length && !cameras.length) {
+                mapEl.innerHTML = '<div class="flex items-center justify-center h-full text-slate-600 text-sm">No route data available</div>';
+                document.getElementById('routeSummary').textContent = '';
+                return;
+            }
+
+            map = L.map(mapEl, {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([23.0, 72.5], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19, attribution: ''
+            }).addTo(map);
+
+            routeLayer = L.layerGroup().addTo(map);
+
+            const points = route.length ? route : cameras.filter(c => c.latitude && c.longitude);
+            if (!points.length) {
+                document.getElementById('routeSummary').textContent = 'No coordinate data available';
+                return;
+            }
+
+            const latlngs = points.filter(p => p.latitude && p.longitude).map(p => [p.latitude, p.longitude]);
+            if (latlngs.length > 1) {
+                L.polyline(latlngs, {
+                    color: '#38bdf8',
+                    weight: 2,
+                    dashArray: '8, 6',
+                    opacity: 0.7
+                }).addTo(routeLayer);
+            }
+
+            const markerIcon = (num) => L.divIcon({
+                className: '',
+                html: `<div style="width:28px;height:28px;border-radius:50%;background:#0284c7;border:2px solid #0ea5e9;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;font-family:JetBrains Mono,monospace;box-shadow:0 2px 8px rgba(0,0,0,0.5);">${num}</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+
+            points.forEach((p, i) => {
+                if (!p.latitude || !p.longitude) return;
+                const popup = `
+                    <div style="padding:4px;min-width:180px;">
+                        <div style="font-weight:600;color:#e2e8f0;margin-bottom:6px;">${p.camera_name || p.cam_id}</div>
+                        <div style="font-size:12px;color:#94a3b8;line-height:1.6;">
+                            <div>Dept: ${p.department || '--'}</div>
+                            <div>Time: <span style="font-family:JetBrains Mono,monospace;">${p.timestamp || '--'}</span></div>
+                            <div>Direction: ${p.direction || '--'}</div>
+                            <div>Speed: ${p.speed_kmh != null ? p.speed_kmh.toFixed(1) + ' km/h' : '--'}</div>
+                        </div>
+                    </div>`;
+                L.marker([p.latitude, p.longitude], { icon: markerIcon(i + 1) })
+                    .bindPopup(popup)
+                    .addTo(routeLayer);
+            });
+
+            if (latlngs.length > 1) {
+                map.fitBounds(L.latLngBounds(latlngs).pad(0.15));
+            } else if (latlngs.length === 1) {
+                map.setView(latlngs[0], 14);
+            }
+
+            let totalDist = 0;
+            for (let i = 1; i < latlngs.length; i++) {
+                totalDist += haversine(latlngs[i-1][0], latlngs[i-1][1], latlngs[i][0], latlngs[i][1]);
+            }
+            const camCount = points.length;
+            let travelMin = 0;
+            if (points.length >= 2) {
+                const t0 = new Date(points[0].timestamp);
+                const t1 = new Date(points[points.length - 1].timestamp);
+                travelMin = Math.round((t1 - t0) / 60000);
+            }
+            document.getElementById('routeSummary').textContent =
+                `${camCount} cameras | ${totalDist.toFixed(1)} km total distance | ${travelMin} min travel time`;
+        }
+
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function renderTimeline(movements) {
+            const container = document.getElementById('movementTimeline');
+            if (!movements.length) {
+                container.innerHTML = '<p class="text-slate-600 text-sm">No movement data available</p>';
+                return;
+            }
+            const sorted = [...movements].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            container.innerHTML = '<div class="timeline-line"></div>' + sorted.map((m, i) => {
+                const colors = ['#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899'];
+                const color = colors[i % colors.length];
+                const dirArrow = { N: '^', S: 'v', E: '>', W: '<' };
+                return `
+                    <div class="relative flex items-start gap-4">
+                        <div class="absolute left-0 z-10" style="top: 4px;">
+                            <div class="timeline-dot bg-slate-950" style="border-color: ${color};"></div>
+                        </div>
+                        <div class="ml-6">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-mono text-sm font-semibold text-white">${m.cam_id || '--'}</span>
+                                <span class="text-xs text-slate-500">${m.timestamp || '--'}</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-slate-400">
+                                <span>Dir: ${m.direction || '--'}</span>
+                                <span>Speed: ${m.speed_kmh != null ? m.speed_kmh.toFixed(1) + ' km/h' : '--'}</span>
+                                <span>Lat: ${m.latitude != null ? m.latitude.toFixed(4) : '--'}</span>
+                                <span>Lon: ${m.longitude != null ? m.longitude.toFixed(4) : '--'}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function renderDetectionTable(detections) {
+            const tbody = document.getElementById('detectionTableBody');
+            if (!detections.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-600 text-sm">No detection records</td></tr>';
+                return;
+            }
+            tbody.innerHTML = detections.map((d, i) => `
+                <tr class="hover:bg-slate-800/50 transition-colors">
+                    <td class="py-3 px-4 text-slate-500 font-mono text-xs">${i + 1}</td>
+                    <td class="py-3 px-4 text-slate-200 font-mono text-xs">${d.cam_id || '--'}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs px-2 py-0.5 rounded-full ${d.confidence >= 0.9 ? 'bg-green-500/20 text-green-400' : d.confidence >= 0.7 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}">
+                            ${d.confidence != null ? (d.confidence * 100).toFixed(1) + '%' : '--'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-slate-400 font-mono text-xs">${d.timestamp || '--'}</td>
+                    <td class="py-3 px-4">
+                        ${d.is_on_watchlist ? '<span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">Yes</span>' : '<span class="text-xs text-slate-600">No</span>'}
+                    </td>
+                    <td class="py-3 px-4">
+                        ${d.alert_triggered ? '<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">Triggered</span>' : '<span class="text-xs text-slate-600">No</span>'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+    </script>
+    <script src="/static/spa.js"></script>
+</body>
+</html>

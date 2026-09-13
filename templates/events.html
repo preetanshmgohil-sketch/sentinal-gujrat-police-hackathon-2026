@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel VMS | Events</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex">
+
+  <!-- Nav Sidebar -->
+  <nav class="w-[52px] min-h-screen bg-slate-900 border-r border-slate-800 flex flex-col items-center py-3 gap-1 fixed left-0 top-0 z-50">
+    <a href="/" class="w-9 h-9 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors" title="Dashboard">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </a>
+    <a href="/watchlist" class="w-9 h-9 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors" title="Watchlist">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </a>
+    <a href="/vehicle-search" class="w-9 h-9 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors" title="Vehicle Search">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </a>
+    <a href="/anpr-alerts" class="w-9 h-9 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors" title="ANPR Alerts">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </a>
+    <a href="/events" class="w-9 h-9 flex items-center justify-center rounded-md bg-slate-800 text-slate-100 transition-colors" title="Events">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+    </a>
+    <a href="/violations" class="w-9 h-9 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors" title="Violations">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </a>
+  </nav>
+
+  <!-- Main Content -->
+  <div id="page-content" class="ml-[52px] flex-1 min-h-screen">
+    <!-- Header -->
+    <header class="h-[52px] bg-slate-900 border-b border-slate-800 flex items-center px-5 shrink-0">
+      <h1 class="text-sm font-semibold tracking-wide text-slate-100">Sentinel VMS <span class="text-slate-500 font-normal mx-1.5">|</span> <span class="text-slate-400 font-normal">Unified Command</span></h1>
+    </header>
+
+    <!-- Page Content -->
+    <div class="p-5 max-w-[1400px] mx-auto">
+
+      <!-- Title Row -->
+      <div class="flex items-start justify-between mb-5">
+        <div>
+          <h2 class="text-xl font-semibold text-slate-100">Detection Events</h2>
+          <p class="text-sm text-slate-400 mt-0.5">All YOLO object detections and ANPR plate reads from live camera feeds</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></span>
+            Auto-refresh 10s
+          </div>
+          <button onclick="fetchEvents()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-300 transition-colors">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <div class="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+          <button data-filter="all" onclick="setTypeFilter('all')" class="filter-btn px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-slate-100 transition-colors">All</button>
+          <button data-filter="yolo" onclick="setTypeFilter('yolo')" class="filter-btn px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 transition-colors">YOLO (object)</button>
+          <button data-filter="anpr" onclick="setTypeFilter('anpr')" class="filter-btn px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 transition-colors">ANPR (plate)</button>
+        </div>
+        <select id="cameraFilter" onchange="applyFilters()" class="px-3 py-1.5 text-xs font-medium bg-slate-900 border border-slate-800 rounded-md text-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-600 appearance-none cursor-pointer min-w-[180px]">
+          <option value="">All Cameras</option>
+        </select>
+        <div class="relative">
+          <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="text" placeholder="Search labels..." oninput="applyFilters()" class="pl-8 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-md text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600 w-[180px]">
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-4 gap-3 mb-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg px-4 py-3">
+          <div class="text-xs text-slate-500 mb-1">Total Events</div>
+          <div id="statTotal" class="text-xl font-semibold text-slate-100">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg px-4 py-3">
+          <div class="text-xs text-slate-500 mb-1">YOLO Detections</div>
+          <div id="statYolo" class="text-xl font-semibold text-blue-400">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg px-4 py-3">
+          <div class="text-xs text-slate-500 mb-1">ANPR Plate Reads</div>
+          <div id="statAnpr" class="text-xl font-semibold text-purple-400">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg px-4 py-3">
+          <div class="text-xs text-slate-500 mb-1">Unique Cameras</div>
+          <div id="statCameras" class="text-xl font-semibold text-slate-100">-</div>
+        </div>
+      </div>
+
+      <!-- Events Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-left">
+                <th class="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Timestamp</th>
+                <th class="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Camera</th>
+                <th class="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Event Type</th>
+                <th class="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Label</th>
+                <th class="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden py-16 text-center">
+          <svg class="mx-auto mb-3 text-slate-700" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+          <p class="text-sm text-slate-500">No events found</p>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingState" class="py-16 text-center">
+          <div class="inline-block w-5 h-5 border-2 border-slate-600 border-t-slate-300 rounded-full animate-spin mb-3"></div>
+          <p class="text-sm text-slate-500">Loading events...</p>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="paginationControls" class="flex items-center justify-between mt-4">
+        <div id="pageInfo" class="text-xs text-slate-500"></div>
+        <div class="flex items-center gap-2">
+          <button id="prevBtn" onclick="changePage(-1)" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled>Prev</button>
+          <div id="pageNumbers" class="flex items-center gap-1"></div>
+          <button id="nextBtn" onclick="changePage(1)" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+let allEvents = [];
+let filteredEvents = [];
+let currentFilter = 'all';
+let currentPage = 1;
+const perPage = 25;
+let refreshInterval;
+
+function setTypeFilter(type) {
+  currentFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    if (btn.dataset.filter === type) {
+      btn.className = 'filter-btn px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-slate-100 transition-colors';
+    } else {
+      btn.className = 'filter-btn px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 transition-colors';
+    }
+  });
+  currentPage = 1;
+  applyFilters();
+}
+
+function buildCameraFilter(events) {
+  const sel = document.getElementById('cameraFilter');
+  const current = sel.value;
+  const cams = {};
+  events.forEach(e => {
+    const key = e.cam_id || e.camera_name;
+    if (key && !cams[key]) cams[key] = e.camera_name || e.cam_id;
+  });
+  const sorted = Object.entries(cams).sort((a, b) => a[1].localeCompare(b[1]));
+  sel.innerHTML = '<option value="">All Cameras</option>';
+  sorted.forEach(([id, name]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  sel.value = current;
+}
+
+function applyFilters() {
+  const camFilter = document.getElementById('cameraFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase().trim();
+
+  filteredEvents = allEvents.filter(e => {
+    if (currentFilter === 'yolo' && e.event_type !== 'yolo') return false;
+    if (currentFilter === 'anpr' && e.event_type !== 'anpr') return false;
+    if (camFilter && e.cam_id !== camFilter) return false;
+    if (search && !(e.label || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  updateStats();
+  renderTable();
+  renderPagination();
+}
+
+function updateStats() {
+  const yoloCount = allEvents.filter(e => e.event_type === 'yolo').length;
+  const anprCount = allEvents.filter(e => e.event_type === 'anpr').length;
+  const cams = new Set(allEvents.map(e => e.cam_id).filter(Boolean));
+  document.getElementById('statTotal').textContent = allEvents.length;
+  document.getElementById('statYolo').textContent = yoloCount;
+  document.getElementById('statAnpr').textContent = anprCount;
+  document.getElementById('statCameras').textContent = cams.size;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('eventsBody');
+  const empty = document.getElementById('emptyState');
+  const start = (currentPage - 1) * perPage;
+  const page = filteredEvents.slice(start, start + perPage);
+
+  if (filteredEvents.length === 0) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  tbody.innerHTML = page.map(e => {
+    const isYolo = e.event_type === 'yolo';
+    const badgeClass = isYolo ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'bg-purple-500/15 text-purple-400 border-purple-500/30';
+    const badgeText = isYolo ? 'Object Detection' : 'Plate Read';
+    const conf = e.confidence != null ? (e.confidence * 100).toFixed(1) : '-';
+    const confVal = e.confidence || 0;
+    let barColor = 'bg-red-500';
+    if (confVal > 0.7) barColor = 'bg-emerald-500';
+    else if (confVal > 0.5) barColor = 'bg-yellow-500';
+    const labelDisplay = isYolo
+      ? `<span class="text-slate-200">${escapeHtml(e.label || '-')}</span>`
+      : `<span class="text-purple-400 font-mono text-xs">${escapeHtml(e.label || '-')}</span>`;
+    return `<tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+      <td class="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">${escapeHtml(e.timestamp || '-')}</td>
+      <td class="px-4 py-3">
+        <div class="text-xs text-slate-200">${escapeHtml(e.camera_name || e.cam_id || '-')}</div>
+        <div class="text-[10px] text-slate-500">${escapeHtml(e.department || '')}</div>
+      </td>
+      <td class="px-4 py-3"><span class="inline-block px-2 py-0.5 text-[10px] font-medium border rounded-full ${badgeClass}">${badgeText}</span></td>
+      <td class="px-4 py-3">${labelDisplay}</td>
+      <td class="px-4 py-3">
+        <div class="flex items-center gap-2">
+          <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div class="${barColor} h-full rounded-full" style="width:${confVal * 100}%"></div></div>
+          <span class="text-xs text-slate-400">${conf}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderPagination() {
+  const totalPages = Math.ceil(filteredEvents.length / perPage);
+  const start = (currentPage - 1) * perPage + 1;
+  const end = Math.min(currentPage * perPage, filteredEvents.length);
+  document.getElementById('pageInfo').textContent = filteredEvents.length > 0
+    ? `Showing ${start}-${end} of ${filteredEvents.length} events`
+    : '';
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+  const nums = document.getElementById('pageNumbers');
+  nums.innerHTML = '';
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) nums.appendChild(pageBtn(i));
+  } else {
+    nums.appendChild(pageBtn(1));
+    if (currentPage > 3) nums.appendChild(ellipsis());
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      nums.appendChild(pageBtn(i));
+    }
+    if (currentPage < totalPages - 2) nums.appendChild(ellipsis());
+    nums.appendChild(pageBtn(totalPages));
+  }
+}
+
+function pageBtn(n) {
+  const btn = document.createElement('button');
+  btn.textContent = n;
+  btn.className = n === currentPage
+    ? 'w-7 h-7 text-xs font-medium rounded-md bg-slate-700 text-slate-100'
+    : 'w-7 h-7 text-xs font-medium rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors';
+  btn.onclick = () => { currentPage = n; renderTable(); renderPagination(); };
+  return btn;
+}
+
+function ellipsis() {
+  const s = document.createElement('span');
+  s.textContent = '...';
+  s.className = 'text-xs text-slate-600 px-1';
+  return s;
+}
+
+function changePage(delta) {
+  const totalPages = Math.ceil(filteredEvents.length / perPage);
+  currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
+  renderTable();
+  renderPagination();
+}
+
+async function fetchEvents() {
+  try {
+    const res = await fetch('/api/events?limit=200&type=anpr&type=yolo');
+    if (!res.ok) throw new Error(res.status);
+    allEvents = await res.json();
+    buildCameraFilter(allEvents);
+    applyFilters();
+  } catch (err) {
+    console.error('Failed to fetch events:', err);
+  } finally {
+    document.getElementById('loadingState').classList.add('hidden');
+  }
+}
+
+fetchEvents();
+refreshInterval = setInterval(fetchEvents, 10000);
+</script>
+<script src="/static/spa.js"></script>
+
+</body>
+</html>
